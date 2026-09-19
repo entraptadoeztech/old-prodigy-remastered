@@ -1455,7 +1455,14 @@ function abort_callback(reason) {
 
 function load_wasm(url) {
   if (wasm_ready) return;
-  
+
+  //skip this if we are running in single file mode
+  if (!wasmBinaryFile || !isDataURI(wasmBinaryFile)) {
+    wasmBinaryFile = url;
+    createWasm();
+    run();  
+  }
+
   return new Promise((resolve, reject) => {
     if (wasm_ready) return resolve();
     api.events.addEventListener("libcurl_load", () => {
