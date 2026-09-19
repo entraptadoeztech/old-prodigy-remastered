@@ -4,4 +4,4 @@ I’m making this because I want to help bring back fun back in schools. I hope 
 ### Table of Contents 
 - [**How this works**]()
 - [**Things needed**]()
-- [**Credits**]()
+- [**Credits**](CREDITS.md)
