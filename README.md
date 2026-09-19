@@ -1,2 +1,2 @@
-# old-prodigy-remastered
-My old prodigy files but a little better 
+### Old prodigy remastered 
+I’m making this because I want to help bring back fun back in schools. I hope ya enjoy this little project byeee!
