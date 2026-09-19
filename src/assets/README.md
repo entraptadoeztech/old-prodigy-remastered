@@ -5,4 +5,4 @@ This contains assets for the game handled by my [friend](https://github.com/bpog
 —> **[curl.html](curl.html)**
 <br>
 <br>
-<b>This file fetches assets for the game using [libcurl.js](https://github.com/MercuryWorkshop)</b>
+<b>This file fetches assets for the game using [libcurl.js](https://github.com/ading2210/libcurl.js)</b>
