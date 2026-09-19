@@ -6,7 +6,7 @@ So a clever solution to this is to use *[jsDelivr](https://www.jsdelivr.com/)* b
   
 This shows the **[XHR](https://nhimg.org/glossary/xhr-requests/)** requests sent to Prodigy's CDN when we interact with the game.
 ## More About This
-If a network admin were to block XHR requests to a website, the website assets will not load **but** since we used **[libcurl.js](https://github.com/ading2210/libcurl.js)** *it bypasses the network blocks.*
+If a network admin were to block XHR requests to a website(*which they do lol*), the website assets will not load **but** since we used **[libcurl.js](https://github.com/ading2210/libcurl.js)** *it bypasses the network blocks.*
 
 <img src="src/assets/lib.png" alt="libcurl's proxied XHR requests to prodigy's CDN">
 This shows the XHR requests when libcurl.js is used.
