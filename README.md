@@ -7,4 +7,4 @@ I’m making this because I want to help bring back fun back in schools. I hope 
 - [**How this works**](EXPLAIN.md)
 - [**Credits**](CREDITS.md)
 - [**Future Ports**]()
-- [**Contributors**]()
+- [**Contributors**](CONTRIBUTE.md)
