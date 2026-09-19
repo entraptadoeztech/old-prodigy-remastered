@@ -1,1 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Prodigy!</title>
+</head>
 
+<body>
+
+<script src="https://cdn.jsdelivr.net/npm/libcurl.js@0.7.1/libcurl.js"></script>
+
+<script>
+(async () => {
+
+    const PROD = "https://daboss7173.github.io/oldprodigy/3-15-3/";
+    const PROD_BASE = PROD + "";
+
+    try {
+        history.replaceState(null, "", "/");
+    } catch (_) {}
+
+
+    await libcurl.load_wasm(
+        "https://cdn.jsdelivr.net/npm/libcurl.js@0.7.1/libcurl.wasm"
+    );
+
+    libcurl.transport = "wisp";
+
+    libcurl.set_websocket(
+        "wss://wisp.mercurywork.shop/"
+    );
+
+
+
+    const nativeFetch = window.fetch.bind(window);
+
+    const NativeXHR = window.XMLHttpRequest;
+
+    async function curlFetch(url, options = {}) {
+
+        const requestURL =
+            typeof url === "string"
+                ? url
+                : url.url;
+
+        console.log(
+            "[WISP FETCH]",
+            requestURL
+        );
+
+        const result =
+            await libcurl.fetch(
+                requestURL,
+                {
+                    method:
+                        options.method || "GET",
+
+                    headers:
+                        options.headers || {},
+
+                    body:
+                        options.body
+                }
+            );
+
+        const body =
+            await result.arrayBuffer();
+
+        return new Response(
+            body,
+            {
+                status:
+                    result.status,
+
+                statusText:
+                    result.statusText,
+
+                headers:
+                    result.headers
+            }
+        );
+    }
+
+
+    window.fetch = async function(
+        input,
+        options
+    ) {
+
+        let url =
+            typeof input === "string"
+                ? input
+                : input.url;
+
+        try {
+
+            const parsed =
+                new URL(
+                    url,
+                    location.href
+                );
+
+    
+
+            if (
+                parsed.hostname ===
+                    ".github.io" ||
+
+                parsed.hostname.endsWith(
+                    ".io"
+                ) ||
+
+                parsed.hostname.endsWith(
+                    ".io"
+                )
+            ) {
+
+                return await curlFetch(
+                    parsed.href,
+                    options || {}
+                );
+            }
+
+        } catch (_) {}
+
+        return nativeFetch(
+            input,
+            options
+        );
+    };
+
+
+
+    const response =
+        await libcurl.fetch(
+            PROD_BASE
+        );
+
+    if (!response.ok) {
+        throw new Error(
+            "TikTok returned HTTP " +
+            response.status
+        );
+    }
+
+    let html =
+        await response.text();
+
+    console.log(
+        "TikTok HTML:",
+        html.length,
+        "bytes"
+    );
+
+    const parser =
+        new DOMParser();
+
+    const doc =
+        parser.parseFromString(
+            html,
+            "text/html"
+        );
+
+
+    function fixURL(value) {
+
+        if (!value) {
+            return value;
+        }
+
+        value = value.trim();
+
+        if (
+            value.startsWith("data:") ||
+            value.startsWith("blob:") ||
+            value.startsWith("javascript:") ||
+            value.startsWith("mailto:") ||
+            value.startsWith("#")
+        ) {
+            return value;
+        }
+
+        try {
+
+            if (
+                value.startsWith("//")
+            ) {
+                return "https:" + value;
+            }
+
+            if (
+                value.startsWith("/")
+            ) {
+                return PROD + value;
+            }
+
+            return new URL(
+                value,
+                PROD_BASE
+            ).href;
+
+        } catch (_) {
+
+            return value;
+        }
+    }
+
+
+    const attributes = [
+        "src",
+        "href",
+        "poster",
+        "action",
+        "formaction",
+        "cite",
+        "background",
+        "data-src",
+        "data-href",
+        "data-url"
+    ];
+
+    for (const attribute of attributes) {
+
+        for (const element of
+            doc.querySelectorAll(
+                "[" + attribute + "]"
+            )) {
+
+            const value =
+                element.getAttribute(
+                    attribute
+                );
+
+            if (!value) {
+                continue;
+            }
+
+            element.setAttribute(
+                attribute,
+                fixURL(value)
+            );
+        }
+    }
+
+    for (const element of
+        doc.querySelectorAll("[srcset]")) {
+
+        const value =
+            element.getAttribute(
+                "srcset"
+            );
+
+        if (!value) {
+            continue;
+        }
+
+        const rewritten =
+            value
+                .split(",")
+                .map(item => {
+
+                    const parts =
+                        item.trim()
+                            .split(/\s+/);
+
+                    if (!parts.length) {
+                        return item;
+                    }
+
+                    parts[0] =
+                        fixURL(parts[0]);
+
+                    return parts.join(" ");
+                })
+                .join(", ");
+
+        element.setAttribute(
+            "srcset",
+            rewritten
+        );
+    }
+
+
+    for (const element of
+        doc.querySelectorAll(
+            "[style]"
+        )) {
+
+        let style =
+            element.getAttribute(
+                "style"
+            );
+
+        style =
+            style.replace(
+                /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
+                (match, quote, url) => {
+
+                    return (
+                        "url(" +
+                        quote +
+                        fixURL(url) +
+                        quote +
+                        ")"
+                    );
+                }
+            );
+
+        element.setAttribute(
+            "style",
+            style
+        );
+    }
+
+    for (const script of
+        doc.querySelectorAll(
+            "script"
+        )) {
+
+        if (!script.textContent) {
+            continue;
+        }
+
+        let code =
+            script.textContent;
+
+        code =
+            code.replace(
+                /(["'`])\/(?!\/)([^"'`\r\n]*)\1/g,
+                (match, quote, path) => {
+
+                    return (
+                        quote +
+                        PROD +
+                        "/" +
+                        path +
+                        quote
+                    );
+                }
+            );
+
+        code =
+            code.replace(
+                /(["'`])\/\/([^"'`\r\n]+)\1/g,
+                (match, quote, host) => {
+
+                    return (
+                        quote +
+                        "https://" +
+                        host +
+                        quote
+                    );
+                }
+            );
+
+        script.textContent =
+            code;
+    }
+
+    for (const base of
+        doc.querySelectorAll("base")) {
+
+        base.remove();
+    }
+
+
+    const output =
+        "<!DOCTYPE html>\n" +
+        doc.documentElement.outerHTML;
+
+    console.log(
+        "Rewritten TikTok:",
+        output.length,
+        "bytes"
+    );
+
+    document.open();
+
+    document.write(output);
+
+    document.close();
+
+})();
+</script>
+
+</body>
+</html>
