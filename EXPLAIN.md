@@ -12,7 +12,7 @@ If a network admin were to block XHR requests to a website(*which they and [filt
 This shows the XHR requests when libcurl.js is used.
 
 ## What about Curlv3?
-Curlv3 proxies traffic to my subdomain(which in turns proxies another website that hosts the multiplayer version of the game.) Crazy right?
+Curlv3 proxies traffic to my subdomain(which proxies another website that hosts the multiplayer version of the game.) Crazy right?
 
 ### more info
 It also still sends XHR requests to prodigy’s CDN and jsDelivr(as shown in the image below)
