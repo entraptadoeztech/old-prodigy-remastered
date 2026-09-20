@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Prodigy!</title>
+<!-- 1.17-->
+</head>
+
+<body>
+<script src="https://cdn.jsdelivr.net/gh/entraptadoeztech/old-prodigy-remastered@refs/heads/main/src/assets/libcurl.js"></script>
+
+<script>
+(async () => {
+    "use strict";
+
+    const PROD = "https://daboss7173.github.io/oldprodigy/1-17-0/";
+    const PROD_BASE = PROD;
+    const PROD_HOST = new URL(PROD).hostname;
+    const WISP_ENDPOINT = "wss://wisp.mercurywork.shop/";
+
+    // Only route requests that are expected to need the Wisp transport.
+    // The previous `*.io` check also matched unrelated third-party domains.
+    function shouldUseCurl(url) {
+        try {
+            const parsed = new URL(url, location.href);
+            const hostname = parsed.hostname.toLowerCase();
+
+            return hostname === PROD_HOST ||
+                hostname === "github.io" ||
+                hostname.endsWith(".github.io");
+        } catch (_) {
+            return false;
+        }
+    }
+
+    try {
+        history.replaceState(null, "", "/");
+    } catch (_) {}
+
+    try {
+        await libcurl.load_wasm(
+            "https://cdn.jsdelivr.net/npm/libcurl.js@0.7.1/libcurl.wasm"
+        );
+
+        libcurl.transport = "wisp";
+        libcurl.set_websocket(WISP_ENDPOINT);
+
+        const nativeFetch = window.fetch.bind(window);
+
+        async function curlFetch(url, options = {}) {
+            const requestURL = typeof url === "string" ? url : url.url;
+
+            if (!requestURL) {
+                throw new TypeError("A request URL is required");
+            }
+
+            console.debug("[WISP FETCH]", requestURL);
+
+            const result = await libcurl.fetch(requestURL, {
+                method: options.method || "GET",
+                headers: options.headers || {},
+                body: options.body
+            });
+
+            return new Response(await result.arrayBuffer(), {
+                status: result.status,
+                statusText: result.statusText,
+                headers: result.headers
+            });
+        }
+
+        window.fetch = async function(input, options) {
+            const url = typeof input === "string" ? input : input?.url;
+
+            if (url) {
+                try {
+                    const parsed = new URL(url, location.href);
+
+                    if (shouldUseCurl(parsed.href)) {
+                        return await curlFetch(parsed.href, options || {});
+                    }
+                } catch (_) {}
+            }
+
+            return nativeFetch(input, options);
+        };
+
+        const response = await libcurl.fetch(PROD_BASE);
+
+        if (!response.ok) {
+            throw new Error(
+                `Remote page returned HTTP ${response.status}`
+            );
+        }
+
+        const html = await response.text();
+        console.debug("Remote HTML:", html.length, "bytes");
+
+        const doc = new DOMParser().parseFromString(html, "text/html");
+
+        function fixURL(value) {
+            if (!value) {
+                return value;
+            }
+
+            const trimmed = value.trim();
+            const lowerValue = trimmed.toLowerCase();
+
+            if (
+                lowerValue.startsWith("data:") ||
+                lowerValue.startsWith("blob:") ||
+                lowerValue.startsWith("javascript:") ||
+                lowerValue.startsWith("mailto:") ||
+                lowerValue.startsWith("tel:") ||
+                trimmed.startsWith("#")
+            ) {
+                return trimmed;
+            }
+
+            try {
+                if (trimmed.startsWith("//")) {
+                    return "https:" + trimmed;
+                }
+
+                return new URL(trimmed, PROD_BASE).href;
+            } catch (_) {
+                return trimmed;
+            }
+        }
+
+        const attributes = [
+            "src",
+            "href",
+            "poster",
+            "action",
+            "formaction",
+            "cite",
+            "background",
+            "data-src",
+            "data-href",
+            "data-url"
+        ];
+
+        for (const attribute of attributes) {
+            for (const element of doc.querySelectorAll(`[${attribute}]`)) {
+                const value = element.getAttribute(attribute);
+
+                if (value) {
+                    element.setAttribute(attribute, fixURL(value));
+                }
+            }
+        }
+
+        for (const element of doc.querySelectorAll("[srcset]")) {
+            const value = element.getAttribute("srcset");
+
+            if (!value) {
+                continue;
+            }
+
+            const rewritten = value
+                .split(",")
+                .map(item => {
+                    const parts = item.trim().split(/\s+/);
+
+                    if (!parts[0]) {
+                        return item;
+                    }
+
+                    parts[0] = fixURL(parts[0]);
+                    return parts.join(" ");
+                })
+                .join(", ");
+
+            element.setAttribute("srcset", rewritten);
+        }
+
+        for (const element of doc.querySelectorAll("[style]")) {
+            const style = element.getAttribute("style") || "";
+            const rewritten = style.replace(
+                /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
+                (match, quote, url) =>
+                    `url(${quote}${fixURL(url)}${quote})`
+            );
+
+            element.setAttribute("style", rewritten);
+        }
+
+        // Inline scripts cannot be parsed reliably with a regular expression,
+        // so only rewrite the URL forms used by the original page.
+        for (const script of doc.querySelectorAll("script:not([src])")) {
+            if (!script.textContent) {
+                continue;
+            }
+
+            let code = script.textContent;
+            code = code.replace(
+                /(["'`])\/(?!\/)([^"'`\r\n]*)\1/g,
+                (match, quote, path) => `${quote}${fixURL(`/${path}`)}${quote}`
+            );
+            code = code.replace(
+                /(["'`])\/\/([^"'`\r\n]+)\1/g,
+                (match, quote, host) => `${quote}https://${host}${quote}`
+            );
+
+            script.textContent = code;
+        }
+
+        for (const base of doc.querySelectorAll("base")) {
+            base.remove();
+        }
+
+        const output = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+        console.debug("Rewritten remote HTML:", output.length, "bytes");
+
+        document.open();
+        document.write(output);
+        document.close();
+    } catch (error) {
+        console.error("Unable to load the Prodigy page", error);
+        document.body.textContent =
+            "Unable to load the Prodigy page. Check the browser console for details.";
+    }
+})();
+</script>
+</body>
+</html>
