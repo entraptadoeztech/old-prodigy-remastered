@@ -14,5 +14,5 @@ This contains assets for the game handled by my [friend](https://github.com/bpog
 
 —-> **[Curlv3](curlv3.html)**
 
-I added **multiplayer support**
+**Multiplayer version <3** 
 
