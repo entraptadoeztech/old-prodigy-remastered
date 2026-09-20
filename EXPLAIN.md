@@ -16,5 +16,5 @@ Curlv3 proxies traffic to my subdomain(which in turns proxies another website th
 
 ### more info
 It also still sends XHR requests to prodigy’s CDN and jsDelivr(as shown in the image below)
-<img src="src/assets/prod.png" alt="pic of prodigy's network requests">
+<img src="src/assets/v3.png" alt="pic of prodigy's network requests">
 
