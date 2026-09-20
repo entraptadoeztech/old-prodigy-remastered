@@ -3,23 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <title>Prodigy!</title>
-<!-- Version 2: hosted the libcurl files on jsDelivr(project made by entraptadoeztech-->
+<!-- Version 3: hosted the libcurl files on jsDelivr (project made by entraptadoeztech) -->
 </head>
 
 <body>
 
-<script src="https://cdn.jsdelivr.net/gh/entraptadoeztech/old-prodigy-remastered@refs/heads/main/src/assets/libcurl.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/entraptadoeztech/old-prodigy-remastered@c3ea8ab7075ee8b780d0855dd61159de57a97478/src/assets/libcurl.js"></script>
 
 <script>
 (async () => {
 
     const PROD = "https://oldprodigy.onrender.com/play/index.html";
-    const PROD_BASE = PROD + "";
+    const PROD_BASE = new URL(PROD);
+    const PROD_ORIGIN = PROD_BASE.origin;
+    const PROXY_HOSTS = new Set([
+        PROD_BASE.hostname
+    ]);
 
     try {
         history.replaceState(null, "", "/");
     } catch (_) {}
-
 
     await libcurl.load_wasm(
         "https://cdn.jsdelivr.net/npm/libcurl.js@0.7.1/libcurl.wasm"
@@ -31,11 +34,7 @@
         "wss://wisp.mercurywork.shop/"
     );
 
-
-
     const nativeFetch = window.fetch.bind(window);
-
-    const NativeXHR = window.XMLHttpRequest;
 
     async function curlFetch(url, options = {}) {
 
@@ -82,16 +81,22 @@
         );
     }
 
-
     window.fetch = async function(
         input,
-        options
+        options = {}
     ) {
 
-        let url =
-            typeof input === "string"
+        const request =
+            input instanceof Request
                 ? input
-                : input.url;
+                : null;
+
+        const url =
+            request
+                ? request.url
+                : typeof input === "string"
+                    ? input
+                    : input.url;
 
         try {
 
@@ -101,24 +106,31 @@
                     location.href
                 );
 
-    
-
             if (
-                parsed.hostname ===
-                    ".github.io" ||
-
-                parsed.hostname.endsWith(
-                    ".io"
-                ) ||
-
-                parsed.hostname.endsWith(
-                    ".io"
-                )
+                PROXY_HOSTS.has(parsed.hostname) ||
+                parsed.hostname.endsWith(".github.io")
             ) {
+
+                const requestOptions = {
+                    ...options
+                };
+
+                if (request) {
+                    requestOptions.method ||= request.method;
+                    requestOptions.headers ||= Object.fromEntries(request.headers);
+
+                    if (
+                        request.method !== "GET" &&
+                        request.method !== "HEAD" &&
+                        requestOptions.body === undefined
+                    ) {
+                        requestOptions.body = await request.clone().arrayBuffer();
+                    }
+                }
 
                 return await curlFetch(
                     parsed.href,
-                    options || {}
+                    requestOptions
                 );
             }
 
@@ -130,25 +142,23 @@
         );
     };
 
-
-
     const response =
         await libcurl.fetch(
-            PROD_BASE
+            PROD_BASE.href
         );
 
     if (!response.ok) {
         throw new Error(
-            "TikTok returned HTTP " +
+            "Prodigy returned HTTP " +
             response.status
         );
     }
 
-    let html =
+    const html =
         await response.text();
 
     console.log(
-        "TikTok HTML:",
+        "Prodigy HTML:",
         html.length,
         "bytes"
     );
@@ -161,7 +171,6 @@
             html,
             "text/html"
         );
-
 
     function fixURL(value) {
 
@@ -183,16 +192,8 @@
 
         try {
 
-            if (
-                value.startsWith("//")
-            ) {
+            if (value.startsWith("//")) {
                 return "https:" + value;
-            }
-
-            if (
-                value.startsWith("/")
-            ) {
-                return PROD + value;
             }
 
             return new URL(
@@ -205,7 +206,6 @@
             return value;
         }
     }
-
 
     const attributes = [
         "src",
@@ -281,11 +281,8 @@
         );
     }
 
-
     for (const element of
-        doc.querySelectorAll(
-            "[style]"
-        )) {
+        doc.querySelectorAll("[style]")) {
 
         let style =
             element.getAttribute(
@@ -314,9 +311,7 @@
     }
 
     for (const script of
-        doc.querySelectorAll(
-            "script"
-        )) {
+        doc.querySelectorAll("script")) {
 
         if (!script.textContent) {
             continue;
@@ -332,9 +327,7 @@
 
                     return (
                         quote +
-                        PROD +
-                        "/" +
-                        path +
+                        fixURL("/" + path) +
                         quote
                     );
                 }
@@ -364,13 +357,12 @@
         base.remove();
     }
 
-
     const output =
         "<!DOCTYPE html>\n" +
         doc.documentElement.outerHTML;
 
     console.log(
-        "Rewritten TikTok:",
+        "Rewritten Prodigy HTML:",
         output.length,
         "bytes"
     );
