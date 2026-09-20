@@ -1,1 +1,1 @@
-<img src= "src/assets/prodigy-logo.jpg" alt="logo">
+<img src= "src/assets/securly.png" alt="logo">
