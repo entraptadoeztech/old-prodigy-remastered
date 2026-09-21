@@ -8,4 +8,4 @@ I’m making this because I want to help bring back fun back in schools. I hope 
 - [**Credits**](CREDITS.md)
 - [**Future Ports**](PORTS.md)
 - [**Contributors**](CONTRIBUTE.md)
-- [Issues]()
+- [**Issues**](ISSUES.md)
