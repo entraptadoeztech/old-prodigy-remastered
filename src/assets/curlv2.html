@@ -3,386 +3,192 @@
 <head>
 <meta charset="UTF-8">
 <title>Prodigy!</title>
-<!-- Version 2: hosted the libcurl files on jsDelivr(project made by entraptadoeztech)-->
+<!-- Version 2: hosted the libcurl files on jsDelivr (project made by entraptadoeztech) -->
 </head>
-
 <body>
-
 <script src="https://cdn.jsdelivr.net/gh/entraptadoeztech/old-prodigy-remastered@refs/heads/main/src/assets/libcurl.js"></script>
-
 <script>
 (async () => {
-
     const PROD = "https://daboss7173.github.io/oldprodigy/3-15-3/";
-    const PROD_BASE = PROD + "";
+    const PROD_BASE = new URL(PROD);
+    const TARGET_ORIGIN = PROD_BASE.origin;
 
-    try {
-        history.replaceState(null, "", "/");
-    } catch (_) {}
-
-
-    await libcurl.load_wasm(
-        "https://cdn.jsdelivr.net/gh/entraptadoeztech/old-prodigy-remastered@refs/heads/main/src/assets/libcurl.wasm"
-    );
-
-    libcurl.transport = "wisp";
-
-    libcurl.set_websocket(
-        "wss://wisp.mercurywork.shop/"
-    );
-
-
+    const LIBCURL_WASM =
+        "https://cdn.jsdelivr.net/gh/entraptadoeztech/old-prodigy-remastered@refs/heads/main/src/assets/libcurl.wasm";
 
     const nativeFetch = window.fetch.bind(window);
 
-    const NativeXHR = window.XMLHttpRequest;
-
-    async function curlFetch(url, options = {}) {
-
-        const requestURL =
-            typeof url === "string"
-                ? url
-                : url.url;
-
-        console.log(
-            "[WISP FETCH]",
-            requestURL
-        );
-
-        const result =
-            await libcurl.fetch(
-                requestURL,
-                {
-                    method:
-                        options.method || "GET",
-
-                    headers:
-                        options.headers || {},
-
-                    body:
-                        options.body
-                }
-            );
-
-        const body =
-            await result.arrayBuffer();
-
-        return new Response(
-            body,
-            {
-                status:
-                    result.status,
-
-                statusText:
-                    result.statusText,
-
-                headers:
-                    result.headers
-            }
-        );
-    }
-
-
-    window.fetch = async function(
-        input,
-        options
-    ) {
-
-        let url =
-            typeof input === "string"
-                ? input
-                : input.url;
-
+    function isTargetURL(value) {
         try {
-
-            const parsed =
-                new URL(
-                    url,
-                    location.href
-                );
-
-    
-
-            if (
-                parsed.hostname ===
-                    ".github.io" ||
-
-                parsed.hostname.endsWith(
-                    ".io"
-                ) ||
-
-                parsed.hostname.endsWith(
-                    ".io"
-                )
-            ) {
-
-                return await curlFetch(
-                    parsed.href,
-                    options || {}
-                );
-            }
-
-        } catch (_) {}
-
-        return nativeFetch(
-            input,
-            options
-        );
-    };
-
-
-
-    const response =
-        await libcurl.fetch(
-            PROD_BASE
-        );
-
-    if (!response.ok) {
-        throw new Error(
-            "TikTok returned HTTP " +
-            response.status
-        );
+            return new URL(value, location.href).origin === TARGET_ORIGIN;
+        } catch (_) {
+            return false;
+        }
     }
-
-    let html =
-        await response.text();
-
-    console.log(
-        "TikTok HTML:",
-        html.length,
-        "bytes"
-    );
-
-    const parser =
-        new DOMParser();
-
-    const doc =
-        parser.parseFromString(
-            html,
-            "text/html"
-        );
-
 
     function fixURL(value) {
-
         if (!value) {
             return value;
         }
 
         value = value.trim();
 
-        if (
-            value.startsWith("data:") ||
-            value.startsWith("blob:") ||
-            value.startsWith("javascript:") ||
-            value.startsWith("mailto:") ||
-            value.startsWith("#")
-        ) {
+        if (/^(?:data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(value)) {
             return value;
         }
 
         try {
-
-            if (
-                value.startsWith("//")
-            ) {
-                return "https:" + value;
-            }
-
-            if (
-                value.startsWith("/")
-            ) {
-                return PROD + value;
-            }
-
-            return new URL(
-                value,
-                PROD_BASE
-            ).href;
-
+            return new URL(value, PROD_BASE).href;
         } catch (_) {
-
             return value;
         }
     }
 
+    async function curlFetch(request) {
+        const method = request.method.toUpperCase();
+        const body = method === "GET" || method === "HEAD"
+            ? undefined
+            : await request.clone().arrayBuffer();
 
-    const attributes = [
-        "src",
-        "href",
-        "poster",
-        "action",
-        "formaction",
-        "cite",
-        "background",
-        "data-src",
-        "data-href",
-        "data-url"
-    ];
+        console.log("[WISP FETCH]", request.url);
 
-    for (const attribute of attributes) {
+        const result = await libcurl.fetch(request.url, {
+            method,
+            headers: Object.fromEntries(request.headers),
+            body
+        });
 
-        for (const element of
-            doc.querySelectorAll(
-                "[" + attribute + "]"
-            )) {
+        return new Response(await result.arrayBuffer(), {
+            status: result.status,
+            statusText: result.statusText,
+            headers: result.headers
+        });
+    }
 
-            const value =
-                element.getAttribute(
-                    attribute
-                );
+    window.fetch = function(input, init = {}) {
+        let request;
+
+        try {
+            request = input instanceof Request
+                ? input
+                : new Request(input, init);
+        } catch (_) {
+            return nativeFetch(input, init);
+        }
+
+        if (isTargetURL(request.url)) {
+            return curlFetch(request);
+        }
+
+        return nativeFetch(input, init);
+    };
+
+    try {
+        await libcurl.load_wasm(LIBCURL_WASM);
+
+        libcurl.transport = "wisp";
+        libcurl.set_websocket("wss://wisp.mercurywork.shop/");
+
+        const response = await libcurl.fetch(PROD);
+
+        if (!response.ok) {
+            throw new Error(`Target app returned HTTP ${response.status}`);
+        }
+
+        const html = await response.text();
+        console.log("Target HTML:", html.length, "bytes");
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        const attributes = [
+            "src",
+            "href",
+            "poster",
+            "action",
+            "formaction",
+            "cite",
+            "background",
+            "data-src",
+            "data-href",
+            "data-url"
+        ];
+
+        for (const attribute of attributes) {
+            for (const element of doc.querySelectorAll(`[${attribute}]`)) {
+                const value = element.getAttribute(attribute);
+
+                if (value) {
+                    element.setAttribute(attribute, fixURL(value));
+                }
+            }
+        }
+
+        for (const element of doc.querySelectorAll("[srcset]")) {
+            const value = element.getAttribute("srcset");
 
             if (!value) {
                 continue;
             }
 
-            element.setAttribute(
-                attribute,
-                fixURL(value)
-            );
-        }
-    }
-
-    for (const element of
-        doc.querySelectorAll("[srcset]")) {
-
-        const value =
-            element.getAttribute(
-                "srcset"
-            );
-
-        if (!value) {
-            continue;
-        }
-
-        const rewritten =
-            value
+            const rewritten = value
                 .split(",")
                 .map(item => {
+                    const parts = item.trim().split(/\s+/);
 
-                    const parts =
-                        item.trim()
-                            .split(/\s+/);
-
-                    if (!parts.length) {
-                        return item;
+                    if (parts[0]) {
+                        parts[0] = fixURL(parts[0]);
                     }
-
-                    parts[0] =
-                        fixURL(parts[0]);
 
                     return parts.join(" ");
                 })
                 .join(", ");
 
-        element.setAttribute(
-            "srcset",
-            rewritten
-        );
-    }
-
-
-    for (const element of
-        doc.querySelectorAll(
-            "[style]"
-        )) {
-
-        let style =
-            element.getAttribute(
-                "style"
-            );
-
-        style =
-            style.replace(
-                /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
-                (match, quote, url) => {
-
-                    return (
-                        "url(" +
-                        quote +
-                        fixURL(url) +
-                        quote +
-                        ")"
-                    );
-                }
-            );
-
-        element.setAttribute(
-            "style",
-            style
-        );
-    }
-
-    for (const script of
-        doc.querySelectorAll(
-            "script"
-        )) {
-
-        if (!script.textContent) {
-            continue;
+            element.setAttribute("srcset", rewritten);
         }
 
-        let code =
-            script.textContent;
+        for (const element of doc.querySelectorAll("[style]")) {
+            const style = element.getAttribute("style");
 
-        code =
-            code.replace(
-                /(["'`])\/(?!\/)([^"'`\r\n]*)\1/g,
-                (match, quote, path) => {
+            if (style) {
+                element.setAttribute(
+                    "style",
+                    style.replace(
+                        /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
+                        (match, quote, url) => `url(${quote}${fixURL(url)}${quote})`
+                    )
+                );
+            }
+        }
 
-                    return (
-                        quote +
-                        PROD +
-                        "/" +
-                        path +
-                        quote
-                    );
-                }
+        // The original app may construct root-relative asset URLs in inline code.
+        // Keep this intentionally limited to quoted root-relative strings.
+        for (const script of doc.querySelectorAll("script:not([src])")) {
+            if (!script.textContent) {
+                continue;
+            }
+
+            script.textContent = script.textContent.replace(
+                /(["'`])\/(?![/*])([^"'`\r\n]*)\1/g,
+                (match, quote, path) => `${quote}${fixURL(`/${path}`)}${quote}`
             );
+        }
 
-        code =
-            code.replace(
-                /(["'`])\/\/([^"'`\r\n]+)\1/g,
-                (match, quote, host) => {
+        for (const base of doc.querySelectorAll("base")) {
+            base.remove();
+        }
 
-                    return (
-                        quote +
-                        "https://" +
-                        host +
-                        quote
-                    );
-                }
-            );
+        const output = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+        console.log("Rewritten app HTML:", output.length, "bytes");
 
-        script.textContent =
-            code;
+        document.open();
+        document.write(output);
+        document.close();
+    } catch (error) {
+        console.error("Failed to load the Prodigy app", error);
+        document.body.textContent = "Unable to load the Prodigy app. Check the browser console for details.";
     }
-
-    for (const base of
-        doc.querySelectorAll("base")) {
-
-        base.remove();
-    }
-
-
-    const output =
-        "<!DOCTYPE html>\n" +
-        doc.documentElement.outerHTML;
-
-    console.log(
-        "Rewritten TikTok:",
-        output.length,
-        "bytes"
-    );
-
-    document.open();
-
-    document.write(output);
-
-    document.close();
-
 })();
 </script>
-
 </body>
 </html>
